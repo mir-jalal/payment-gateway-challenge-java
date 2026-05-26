@@ -5,15 +5,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.checkout.payment.gateway.enums.PaymentStatus;
-import com.checkout.payment.gateway.model.PostPaymentResponse;
+import com.checkout.payment.gateway.model.Payment;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 @SpringBootTest
@@ -27,14 +27,14 @@ class PaymentGatewayControllerTest {
 
   @Test
   void whenPaymentWithIdExistThenCorrectPaymentIsReturned() throws Exception {
-    PostPaymentResponse payment = new PostPaymentResponse();
+    Payment payment = new Payment();
     payment.setId(UUID.randomUUID());
     payment.setAmount(10);
     payment.setCurrency("USD");
     payment.setStatus(PaymentStatus.AUTHORIZED);
     payment.setExpiryMonth(12);
     payment.setExpiryYear(2024);
-    payment.setCardNumberLastFour(4321);
+    payment.setCardNumberLastFour("4321");
 
     paymentsRepository.add(payment);
 
@@ -49,9 +49,35 @@ class PaymentGatewayControllerTest {
   }
 
   @Test
-  void whenPaymentWithIdDoesNotExistThen404IsReturned() throws Exception {
+  void whenPaymentWithIdDoesNotExistThenBadRequestIsReturned() throws Exception {
     mvc.perform(MockMvcRequestBuilders.get("/payment/" + UUID.randomUUID()))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("Page not found"));
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("Invalid ID"));
+  }
+
+  @Test
+  void whenPaymentIsAuthorizedThenCreatedIsReturned() throws Exception {
+    String requestBody = "{\"card_number\":\"4111111111111111\",\"expiry_month\":12,\"expiry_year\":" + (java.time.Year.now().getValue() + 1) + ",\"currency\":\"USD\",\"amount\":100,\"cvv\":\"123\"}";
+
+    mvc.perform(MockMvcRequestBuilders.post("/payment")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.status").value(PaymentStatus.AUTHORIZED.getName()))
+        .andExpect(jsonPath("$.currency").value("USD"))
+        .andExpect(jsonPath("$.amount").value(100));
+  }
+
+  @Test
+  void whenPaymentIsDeclinedThenBadRequestIsReturned() throws Exception {
+    String requestBody = "{\"card_number\":\"4242424242424242\",\"expiry_month\":12,\"expiry_year\":" + (java.time.Year.now().getValue() + 1) + ",\"currency\":\"USD\",\"amount\":100,\"cvv\":\"123\"}";
+
+    mvc.perform(MockMvcRequestBuilders.post("/payment")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(requestBody))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(PaymentStatus.DECLINED.getName()))
+        .andExpect(jsonPath("$.currency").value("USD"))
+        .andExpect(jsonPath("$.amount").value(100));
   }
 }
