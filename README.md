@@ -23,3 +23,20 @@ docker-compose.yml - configures the bank simulator
 For documentation openAPI is included, and it can be found under the following url: **http://localhost:8090/swagger-ui/index.html**
 
 **Feel free to change the structure of the solution, use a different library etc.**
+
+# Implementation Summary
+
+## Design Decisions
+- `PaymentGatewayServiceImpl` implements `PaymentGatewayService` and contains the main processing flow. It does validation, delegate payment processing, and persist payment results.
+- `PaymentGatewayController` exposes two endpoints:
+  - `POST /payment` to process a payment request
+  - `GET /payment/{id}` to retrieve a payment by UUID=
+- Payment Gateway Abstraction: This abstraction supports future gateway implementations without changing service logic.
+- `BankGateway` is an implementation that sends the request to a bank simulation service via `RestTemplate`
+
+## Testing
+- `PaymentGatewayControllerTest` covers:
+  - retrieving an existing payment returns `200 OK`
+  - unknown payment IDs return validation-style error responses
+  - authorized payments return `201 Created`
+  - declined payments return `400 Bad Request`
